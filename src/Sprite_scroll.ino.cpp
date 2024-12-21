@@ -1,10 +1,39 @@
-#define AAAMODS
+#include <Arduino.h> // for uint8_t etc. etc.
+
+#define AAAMODS // ST7789 LCD 170 x 320 pixels
+
+#define DEF_TFT_TERMINAL // used in pin_config-t-display-esp32-s3.h
+#define MYSERIALX Serial1
+#define DEF_SERIAL_DELAY						100
+#define BAUD_SERIAL1 (115200)
 
 #if(0)
 #define AAAMODS_SCROLL_DOWN
 #else
 #define AAAMODS_SCROLL_UP
 #endif
+
+const uint8_t TEXT_WIDTH = 16; // font plus spacing
+const uint8_t TEXT_HEIGHT = 16; // font plus spacing
+
+// The scrolling area must be a integral multiple of TEXT_HEIGHT
+//#define TEXT_HEIGHT 16 // Height of text to be printed and scrolled
+//const uint8_t TOP_FIXED_AREA = 2; // Number of lines in top fixed area (lines counted from top of screen)
+const uint8_t TOP_FIXED_AREA = 0; // Number of lines in top fixed area (lines counted from top of screen)
+const uint8_t BOT_FIXED_AREA = 0; // Number of lines in bottom fixed area (lines counted from bottom of screen)
+//#define YMAX 320 // Bottom of screen area
+
+//uint16_t yStart = TOP_FIXED_AREA;
+byte data = 0;
+uint16_t xPos = 0;
+
+//uint16_t yDraw = YMAX - BOT_FIXED_AREA - TEXT_HEIGHT; // The initial y coordinate of the top of the bottom text line
+
+
+const uint16_t MAX_PIXELS_WIDTH   = 170;
+const uint16_t MAX_PIXELS_HEIGHT  = 320;
+
+
 
 /*
   Sketch to show scrolling of the graphics in sprites.
@@ -37,11 +66,12 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
-TFT_eSprite graph1 = TFT_eSprite(&tft); // Sprite object graph1
+//TFT_eSprite graph1 = TFT_eSprite(&tft); // Sprite object graph1
 
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
+TFT_eSprite stextTop = TFT_eSprite(&tft); // Sprite object stextTop
 
-TFT_eSprite stext2 = TFT_eSprite(&tft); // Sprite object stext2
+//TFT_eSprite stext2 = TFT_eSprite(&tft); // Sprite object stext2
 
 int graphVal = 1;
 int delta = 1;
@@ -50,6 +80,18 @@ int tcount = 0;
 
 //==========================================================================================
 void setup() {
+
+#ifdef DEF_TFT_TERMINAL
+
+  Serial.begin(115200);
+	delay(DEF_SERIAL_DELAY); // Need time here?
+  
+#ifdef MYSERIAL1_BEGIN
+	MYSERIAL1_BEGIN;
+	delay(DEF_SERIAL_DELAY); // Need time here?
+#endif
+
+#endif // AAA_TFT_TERMINAL
 
  
 #ifdef INIDEF_LILYGO_T_DISPLAY_S3
@@ -63,17 +105,28 @@ void setup() {
   tft.init();
 
 #ifdef AAAMODS // scrolling vertically
-  //tft.fillScreen(TFT_BLUE);
-  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(TFT_BLUE);
+  //tft.fillScreen(TFT_BLACK);
   graphVal = 1; // initial number to scroll vertically
+
+  // Create a sprite for the top line(s)
+  stextTop.setColorDepth(8);
+  stextTop.createSprite(MAX_PIXELS_WIDTH, TEXT_HEIGHT); // width, height, frames
+  stextTop.fillSprite(TFT_BLACK); // Fill sprite with colour
+  stextTop.setTextColor(TFT_WHITE); // White text, no background
+  stextTop.setTextDatum(BR_DATUM);  // Bottom right coordinate datum
+
+  stextTop.print("TCM RC SERIAL 2024-12-21");
+  stextTop.pushSprite(0, 0); // x, y - insert text at top-left of printing area
+
 
   // Create a sprite for the scrolling numbers
   stext1.setColorDepth(8);
   //stext1.createSprite(32, 64); // width, height, frames
-  stext1.createSprite(170, 320); // width, height, frames
+  stext1.createSprite(MAX_PIXELS_WIDTH, (MAX_PIXELS_HEIGHT - (TOP_FIXED_AREA * TEXT_HEIGHT))); // width, height, frames
   stext1.fillSprite(TFT_BLUE); // Fill sprite with blue
   //stext1.setScrollRect(0, 0, 32, 64, TFT_BLUE);     // x, y, w. h, color
-  stext1.setScrollRect(0, 0, 170, 320, TFT_BLUE);     // x, y, w. h, color
+  stext1.setScrollRect(0, 0, MAX_PIXELS_WIDTH, (MAX_PIXELS_HEIGHT - (TOP_FIXED_AREA * TEXT_HEIGHT)), TFT_BLUE); // x, y, w. h, color
   stext1.setTextColor(TFT_WHITE); // White text, no background
   stext1.setTextDatum(BR_DATUM);  // Bottom right coordinate datum
 
@@ -115,17 +168,43 @@ void loop() {
 
 #ifdef AAAMODS
 
-  delay(500); // wait so things do not scroll too fast
-  graphVal+=delta;
+  //delay(500); // wait so things do not scroll too fast
+
+  while (MYSERIALX.available()) {
+    data = MYSERIALX.read();
+
+    MYSERIALX.write(data); // Perform a remote echo for testing.
+
+    // If it is a CR or we are near end of line then scroll one line
+    if (data == '\r' || xPos > (MAX_PIXELS_WIDTH - TEXT_WIDTH)) {
+      xPos = 0;
+      stext1.setCursor(0,(MAX_PIXELS_HEIGHT - TEXT_HEIGHT));
+      //stext1.setCursor(0, 0);
+      //stext1.pushSprite(0, 0); // x, y - insert text at top-left of printing area. bot-left ?
+      stext1.pushSprite(0, (TOP_FIXED_AREA * TEXT_HEIGHT)); // x, y - insert text at top-left of scrolling area
+      stext1.scroll(0, -TEXT_HEIGHT); // dx,dy : scroll stext 0 pixels left/right, 16 up.
+    }
+    if (data > 31 && data < 128) { // check if data is ASCII printable AAAMAGIC
+      //xPos += TEXT_WIDTH;
+      //xPos += (TEXT_WIDTH / 2);
+      xPos += (TEXT_WIDTH - 10); // AAAFIXME
+      //xPos += tft.drawChar(data,xPos,yDraw,2);
+      //blank[(18+(yStart-TOP_FIXED_AREA)/TEXT_HEIGHT)%19]=xPos; // Keep a record of line lengths
+      stext1.print((char)data);
+    }
+    //change_colour = 1; // Line to indicate buffer is being emptied
+
+  } // while
 
   // Draw number in stext1 sprite at 31,63 (bottom right datum set)
   //stext1.drawNumber(graphVal, 31, 63, 2); // plot value in font 2
 
-  stext1.print("line ");
 #if(1)
-  stext1.print(graphVal, 10); // num, base
+  //graphVal+=delta;
+  //stext1.print(graphVal, 10); // num, base
+  //stext1.print(data);
 #else
-  stext1.println(graphVal, 10); // num, base
+  //stext1.println(graphVal, 10); // num, base
 #endif
 
 #ifdef AAAMODS_SCROLL_DOWN
@@ -135,11 +214,14 @@ void loop() {
 #endif
 
 #ifdef AAAMODS_SCROLL_UP
-  stext1.setCursor(0,(320 - 16));
-  stext1.pushSprite(0, 0); // x, y - insert text at top-left of printing area
-  stext1.scroll(0,-8); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
-  //stext1.scroll(0,-16); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
+  //stext1.setCursor(0,(MAX_PIXELS_HEIGHT - TEXT_HEIGHT));
+  //stext1.pushSprite(0, 0); // x, y - insert text at top-left of printing area
+  //stext1.scroll(0,-8); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
 #endif
+
+
+
+
 
 #else
 
