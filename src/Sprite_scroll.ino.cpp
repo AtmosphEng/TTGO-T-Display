@@ -1,4 +1,11 @@
 #define AAAMODS
+
+#if(0)
+#define AAAMODS_SCROLL_DOWN
+#else
+#define AAAMODS_SCROLL_UP
+#endif
+
 /*
   Sketch to show scrolling of the graphics in sprites.
   Scrolling in this way moves the pixels in a defined rectangle
@@ -108,35 +115,31 @@ void loop() {
 
 #ifdef AAAMODS
 
+  delay(500); // wait so things do not scroll too fast
+  graphVal+=delta;
+
   // Draw number in stext1 sprite at 31,63 (bottom right datum set)
   //stext1.drawNumber(graphVal, 31, 63, 2); // plot value in font 2
 
-  stext1.setCursor(0,0);
-
-  //stext1.println(graphVal, 10); // num, base
   stext1.print("line ");
+#if(1)
   stext1.print(graphVal, 10); // num, base
-  //stext1.print("\r\n");
-  //stext1.setOrigin(0, 0);
+#else
+  stext1.println(graphVal, 10); // num, base
+#endif
 
-  //stext1.pushSprite(0, 64); // x, y
-  stext1.pushSprite(0, 0); // x, y
-
-  // Change the value to plot
-  graphVal+=delta;
-
-
-  delay(500); // wait so things do not scroll too fast
-
-  //stext1.printToSprite()
-
-  //stext1.scroll(0,-32); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
-  //stext1.scroll(0,-16); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
-  //stext1.scroll(0, +8); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
+#ifdef AAAMODS_SCROLL_DOWN
+  stext1.setCursor(0,0);
+  stext1.pushSprite(0, 0); // x, y - insert text at top-left of printing area
   stext1.scroll(0, +16); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
-  //stext1.scroll(0, +32); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
+#endif
 
-  //delay(500); // wait so things do not scroll too fast
+#ifdef AAAMODS_SCROLL_UP
+  stext1.setCursor(0,(320 - 16));
+  stext1.pushSprite(0, 0); // x, y - insert text at top-left of printing area
+  stext1.scroll(0,-8); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
+  //stext1.scroll(0,-16); // dx,dy : scroll stext 0 pixels left/right, 16 up. Not reqd for println()?
+#endif
 
 #else
 
